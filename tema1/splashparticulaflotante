@@ -1,0 +1,120 @@
+PVector position = new PVector(); 
+PVector velocity = new PVector(); 
+PVector acceleration = new PVector(); 
+PVector netForce = new PVector();
+PVector gravityForce = new PVector(0, 9.81); 
+PVector buoyantForce = new PVector(); 
+float gravity = -9.81; 
+float timeStep = 0.01; 
+float mass = 0.1; 
+float waterLevel; 
+float fluidDensity = 0.00001; 
+float submergedVolume; 
+float buoyancy; // Fuerza de flotación
+float radius = 50; // Radio de la partícula principal
+ArrayList<Particle> splashParticles = new ArrayList<Particle>(); // Lista de partículas de salpicadura
+
+void setup() {
+  size(1920, 1080);
+  waterLevel = 2 * height / 3; // Establecer el nivel del agua
+  position.x = width / 2; // Posición inicial en x
+  position.y = height / 3; // Posición inicial en y
+}
+
+void draw() {
+  background(0);
+  
+  updatePhysics(); // Actualizar la física de la partícula principal
+  updateSplashParticles(); // Actualizar las partículas de salpicadura
+
+  // Dibujar la partícula principal
+  fill(255, 0, 0);
+  ellipse(position.x, position.y, radius * 2, radius * 2);
+
+  // Dibujar el agua
+  fill(0, 0, 255, 50);
+  rect(0, waterLevel, width, height);
+
+  // Dibujar las partículas de salpicadura
+  for (Particle sp : splashParticles) {
+    sp.display();
+  }
+}
+
+void updatePhysics() {
+  netForce.set(gravityForce); // Comenzar con la fuerza de gravedad
+
+  if (position.y - radius >= waterLevel) {
+    // La partícula está completamente sumergida
+    submergedVolume = 4 * PI * radius * radius * radius / 3; // Volumen de la partícula (esfera)
+    buoyancy = fluidDensity * gravity * submergedVolume; // Calcular la fuerza de flotación
+    netForce.add(0, buoyancy); // Añadir la fuerza de flotación a la fuerza neta
+  } else if (position.y + radius > waterLevel) {
+    // La partícula está parcialmente sumergida
+    float heightSubmerged = position.y + radius - waterLevel;
+    float submergedArea = sqrt(2 * heightSubmerged * radius - heightSubmerged * heightSubmerged);
+    submergedVolume = (3 * submergedArea * submergedArea + heightSubmerged * heightSubmerged) * PI * heightSubmerged / 6;
+    buoyancy = fluidDensity * gravity * submergedVolume; // Calcular la fuerza de flotación
+    netForce.set(0, buoyancy); // Establecer la fuerza de flotación en la fuerza neta
+  }
+
+  // Comprobar si la partícula ha tocado el agua y generar partículas de salpicadura
+  if (position.y + radius >= waterLevel) {
+    generateSplashParticles();
+  }
+
+  // Calcular la aceleración a partir de la fuerza neta
+  acceleration = PVector.div(netForce, mass);
+  // Actualizar la velocidad y la posición
+  velocity.add(PVector.mult(acceleration, timeStep));
+  position.add(PVector.mult(velocity, timeStep));
+}
+
+void generateSplashParticles() {
+  for (int i = 0; i < 10; i++) {
+    PVector splashPosition = new PVector(position.x, waterLevel);
+    PVector splashVelocity = PVector.random2D();
+    splashVelocity.mult(random(1, 3));
+    Particle sp = new Particle(splashPosition, splashVelocity);
+    splashParticles.add(sp);
+  }
+}
+
+void updateSplashParticles() {
+  for (int i = splashParticles.size() - 1; i >= 0; i--) {
+    Particle sp = splashParticles.get(i);
+    sp.update();
+    if (sp.isDead()) {
+      splashParticles.remove(i);
+    }
+  }
+}
+
+
+class Particle {
+  PVector position; 
+  PVector velocity; 
+  float lifespan; 
+  
+  Particle(PVector position, PVector velocity) {
+    this.position = position.copy();
+    this.velocity = velocity.copy();
+    this.lifespan = 255; // Vida útil inicial (valor máximo)
+  }
+  
+  void update() {
+    velocity.y += 0.1; // Simular la gravedad en las partículas de salpicadura
+    position.add(velocity); // Actualizar la posición
+    lifespan -= 5; // Reducir la vida útil
+  }
+  
+  void display() {
+    stroke(255, lifespan); // Ajustar la opacidad según la vida útil
+    fill(255, lifespan);
+    ellipse(position.x, position.y, 5, 5); // Dibujar la partícula
+  }
+  
+  boolean isDead() {
+    return lifespan <= 0; // Comprobar si la partícula ha muerto
+  }
+}
